@@ -1,18 +1,31 @@
 """Platform for sensor integration."""
+import logging
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.typing import HomeAssistantType
+
+from .const import DOMAIN, REGION_CODE
 from .OctopusAgile.Agile import Agile
-import logging
+from .utils import get_region_code
+
 _LOGGER = logging.getLogger(__name__)
 
 
+async def async_setup_entry(
+    hass: HomeAssistantType, entry: ConfigEntry, async_add_devices
+) -> bool:
+
+    async_add_devices([PreviousRate(hass), CurrentRate(hass), NextRate(hass)])
+    return True
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the sensor platform."""
-    add_entities([PreviousRate(hass)])
-    add_entities([CurrentRate(hass)])
-    add_entities([NextRate(hass)])
+# def setup_platform(hass, config, add_entities, discovery_info=None):
+#     """Set up the sensor platform."""
+#     add_entities([PreviousRate(hass)])
+#     add_entities([CurrentRate(hass)])
+#     add_entities([NextRate(hass)])
 
 class PreviousRate(Entity):
     """Representation of a Sensor."""
@@ -25,7 +38,9 @@ class PreviousRate(Entity):
         # if "region_code" not in self.config["OctopusAgile"]:
         #     _LOGGER.error("region_code must be set for OctopusAgile")
         # else:
-        region_code = hass.states.get("octopusagile.region_code").state
+
+        # region_code = hass.states.get("octopusagile.region_code").state
+        region_code = get_region_code(hass)
         self.myrates = Agile(region_code)
 
     @property
@@ -72,7 +87,9 @@ class CurrentRate(Entity):
         # if "region_code" not in self.config["OctopusAgile"]:
         #     _LOGGER.error("region_code must be set for OctopusAgile")
         # else:
-        region_code = hass.states.get("octopusagile.region_code").state
+
+        # region_code = hass.states.get("octopusagile.region_code").state
+        region_code = get_region_code(hass)
         self.myrates = Agile(region_code)
 
     @property
@@ -119,7 +136,9 @@ class NextRate(Entity):
         # if "region_code" not in self.config["OctopusAgile"]:
         #     _LOGGER.error("region_code must be set for OctopusAgile")
         # else:
-        region_code = hass.states.get("octopusagile.region_code").state
+        
+        # region_code = hass.states.get("octopusagile.region_code").state
+        region_code = get_region_code(hass)
         self.myrates = Agile(region_code)
 
     @property

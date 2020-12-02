@@ -1,18 +1,23 @@
 """Config flow for mark integration."""
 import logging
+import requests
+
+from typing import Any, Dict
 
 import voluptuous as vol
 
 from homeassistant import config_entries, core, exceptions
 
-from .const import DOMAIN  # pylint:disable=unused-import
+from .const import DOMAIN, REGION_CODE
 
 _LOGGER = logging.getLogger(__name__)
 
 # TODO adjust the data schema to the data that you need
 DATA_SCHEMA = vol.Schema({"host": str, "username": str, "password": str})
 
+_LOGGER.warning("Starting OctopusAgile config flow")
 
+# TODO: Work out if this class is used
 class PlaceholderHub:
     """Placeholder class to make tests pass.
 
@@ -54,33 +59,58 @@ async def validate_input(hass: core.HomeAssistant, data):
     # Return info that you want to store in the config entry.
     return {"title": "Name of the device"}
 
-
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+@config_entries.HANDLERS.register(DOMAIN)
+class OctopusAgileConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for mark."""
+
+    _LOGGER.warning("Starting OctopusAgile config flow Class")
 
     VERSION = 1
     # TODO pick one of the available connection classes in homeassistant/config_entries.py
     CONNECTION_CLASS = config_entries.CONN_CLASS_UNKNOWN
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(self, user_input=None) -> Dict[str, Any]:
         """Handle the initial step."""
-        errors = {}
-        if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
+        _LOGGER.warning("Setting up Octopus Agile integration")
 
-                return self.async_create_entry(title=info["title"], data=user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+        region_code = None
 
-        return self.async_show_form(
-            step_id="user", data_schema=DATA_SCHEMA, errors=errors
+        value = self.hass.states.get("octopusagile.region_code")
+
+        if value:
+            region_code = value.state
+
+        if not region_code:
+            region_code = self._get_region_code_from_coords()
+
+        if not region_code:
+            return self.async_abort()
+
+        self.hass.data[DOMAIN][REGION_CODE] = region_code
+        return self.async_create_entry(title=DOMAIN, data={REGION_CODE: region_code})
+
+    def _get_region_code_from_coords(self) -> str:
+        _LOGGER.info(self.hass.config.latitude)
+        _LOGGER.info(self.hass.config.longitude)
+
+        latitude = self.hass.config.latitude
+        longitude = self.hass.config.longitude
+        outcode = _get_outcode_for_coords(latitude, longitude)
+        if not outcode:
+            return None
+
+        self.hass.data[DOMAIN] = {}
+
+        response = requests.get(
+            f"https://api.octopus.energy/v1/industry/grid-supply-points/?postcode={outcode}"
         )
+
+        response.raise_for_status()
+        try:
+            return response.json()["results"][0]["group_id"][-1]
+        except:
+            _LOGGER.error(response.text)
+            raise
 
 
 class CannotConnect(exceptions.HomeAssistantError):
@@ -89,3 +119,13 @@ class CannotConnect(exceptions.HomeAssistantError):
 
 class InvalidAuth(exceptions.HomeAssistantError):
     """Error to indicate there is invalid auth."""
+
+
+
+
+def _get_outcode_for_coords(lat, lon) -> str:
+    response = requests.get(f"https://api.postcodes.io/outcodes?lon={lon}&lat={lat}")
+    response.raise_for_status()
+    if bool(response.json()["result"]):
+        outcode = response.json()["result"][0]["outcode"]
+        return outcode
