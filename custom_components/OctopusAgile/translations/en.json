@@ -1,7 +1,6 @@
 {
-
-    "title": "Octopus Agile",
     "config": {
+        "title": "Octopus Agile",
         "step": {
             "user": {
                 "title": "Please enter Region Code",
